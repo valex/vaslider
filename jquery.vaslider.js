@@ -12,13 +12,18 @@
         // Options
         this.opts = $.extend({
             // GENERAL
+            infiniteLoop: true,
             preloadImages : 'all',
             speed: 500,
             startSlide: 0,
 
             // AUTO
             pause: 4000,
-            autoDirection: 'next'
+            autoDirection: 'next',
+
+            // CAROUSEL
+            minSlides: 1,
+            maxSlides: 1
         }, options);
 
         // Init
@@ -35,11 +40,14 @@
         {
             // store the original children
             this.children = this.$el.children();
+            // check if actual number of slides is less than minSlides / maxSlides
+            if(this.children.length < this.opts.minSlides) this.opts.minSlides = this.children.length;
+            if(this.children.length < this.opts.maxSlides) this.opts.maxSlides = this.children.length;
 
             // store active slide information
             this.active = { index: this.opts.startSlide }
             // store if the slider is in carousel mode (displaying / moving multiple slides)
-            this.carousel = true;
+            this.carousel = this.opts.minSlides > 1 || this.opts.maxSlides > 1;
             // if carousel, force preloadImages = 'all'
             if(this.carousel) this.opts.preloadImages = 'all';
 
@@ -91,10 +99,12 @@
 
 
             // if infinite loop, prepare additional slides
-            var slice = this.children.length;
-            var sliceAppend = this.children.slice(0, slice).clone().addClass('va-clone');
-            var slicePrepend = this.children.slice(-slice).clone().addClass('va-clone');
-            this.$el.append(sliceAppend).prepend(slicePrepend);
+            if(this.opts.infiniteLoop){
+                var slice = this.children.length;
+                var sliceAppend = this.children.slice(0, slice).clone().addClass('va-clone');
+                var slicePrepend = this.children.slice(-slice).clone().addClass('va-clone');
+                this.$el.append(sliceAppend).prepend(slicePrepend);
+            }
 
 
             // check if startSlide is last slide
@@ -210,6 +220,7 @@
          */
         goToNextSlide:function(){
             // if infiniteLoop is false and last page is showing, disregard call
+            if (!this.opts.infiniteLoop && this.active.index == 0) return;
             var pagerIndex = parseInt(this.active.index) + 1;
             this.goToSlide(pagerIndex, 'next');
         },
@@ -272,13 +283,14 @@
                 // if infinite loop and "Next" is clicked on the last slide
             }else if(direction == 'next' && this.active.index == 0){
                 // get the last clone position
-                position = this.$el.find('> .va-clone').eq(1).position();
+                position = this.$el.find('> .va-clone').eq(this.opts.maxSlides).position();
                 this.active.last = false;
+
                 // normal non-zero requests
             }else if(slideIndex >= 0){
                 position = this.children.eq(slideIndex).position();
             }
-
+console.log(slideIndex);
             /* If the position doesn't exist
              * (e.g. if you destroy the slider on a next click),
              * it doesn't throw an error.
