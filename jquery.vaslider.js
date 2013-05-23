@@ -23,7 +23,10 @@
 
             // CAROUSEL
             minSlides: 1,
-            maxSlides: 1
+            maxSlides: 1,
+            moveSlides: 0,
+            slideWidth: 0
+
         }, options);
 
         // Init
@@ -38,6 +41,9 @@
         // Initialization
         init: function()
         {
+            // parse slideWidth setting
+            this.opts.slideWidth = parseInt(this.opts.slideWidth);
+
             // store the original children
             this.children = this.$el.children();
             // check if actual number of slides is less than minSlides / maxSlides
@@ -78,7 +84,6 @@
                 margin:0,
                 padding:0
             });
-
             // make modifications to the viewport (.va-viewport)
             this.viewport.css({
                 width: '100%',
@@ -97,10 +102,9 @@
             // apply the calculated width after the float is applied to prevent scrollbar interference
             this.children.width(this.getSlideWidth());
 
-
             // if infinite loop, prepare additional slides
             if(this.opts.infiniteLoop){
-                var slice = this.children.length;
+                var slice = this.opts.maxSlides;
                 var sliceAppend = this.children.slice(0, slice).clone().addClass('va-clone');
                 var slicePrepend = this.children.slice(-slice).clone().addClass('va-clone');
                 this.$el.append(sliceAppend).prepend(slicePrepend);
@@ -276,21 +280,24 @@
 
             // horizontal carousel, going previous while on first slide (infiniteLoop mode)
             if(this.carousel && this.active.last && direction == 'prev'){
+console.log('if(this.carousel');
                 // get the last child position
                 //var eq = slider.settings.moveSlides == 1 ? slider.settings.maxSlides - getMoveBy() : ((getPagerQty() - 1) * getMoveBy()) - (slider.children.length - slider.settings.maxSlides);
                 //var lastChild = el.children('.bx-clone').eq(eq);
                 //position = lastChild.position();
                 // if infinite loop and "Next" is clicked on the last slide
             }else if(direction == 'next' && this.active.index == 0){
+console.log('else if(direction == next');
                 // get the last clone position
                 position = this.$el.find('> .va-clone').eq(this.opts.maxSlides).position();
                 this.active.last = false;
 
                 // normal non-zero requests
             }else if(slideIndex >= 0){
+console.log('else if(slideIndex >= 0');
                 position = this.children.eq(slideIndex).position();
             }
-console.log(slideIndex);
+//console.log(slideIndex);
             /* If the position doesn't exist
              * (e.g. if you destroy the slider on a next click),
              * it doesn't throw an error.
@@ -306,46 +313,93 @@ console.log(slideIndex);
             this.working = false;
         },
 
+
+        /**
+         * Returns the number of slides currently visible in the viewport (includes partially visible slides)
+         */
+        getNumberSlidesShowing: function(){
+            var slidesShowing = 1;
+            if(this.opts.mode == 'horizontal' && this.opts.slideWidth > 0){
+
+                var childWidth = this.children.first().width();
+                slidesShowing = Math.floor(this.viewport.width() / childWidth);
+            }
+
+            return slidesShowing;
+        },
+
+
         /**
          * Returns the number of pages (one full viewport of slides is one "page")
          */
         getPagerQty:function(){
             var pagerQty = 0;
-            /*
+
             // if moveSlides is specified by the user
-            if(slider.settings.moveSlides > 0){
-                if(slider.settings.infiniteLoop){
-                    pagerQty = slider.children.length / getMoveBy();
+            if(this.opts.moveSlides > 0){
+                if(this.opts.infiniteLoop){
+                    pagerQty = this.children.length / this.getMoveBy();
                 }else{
                     // use a while loop to determine pages
                     var breakPoint = 0;
                     var counter = 0
                     // when breakpoint goes above children length, counter is the number of pages
-                    while (breakPoint < slider.children.length){
+                    while (breakPoint < this.children.length){
                         ++pagerQty;
-                        breakPoint = counter + getNumberSlidesShowing();
-                        counter += slider.settings.moveSlides <= getNumberSlidesShowing() ? slider.settings.moveSlides : getNumberSlidesShowing();
+                        breakPoint = counter + this.getNumberSlidesShowing();
+                        counter += this.opts.moveSlides <= this.getNumberSlidesShowing() ? this.opts.moveSlides : this.getNumberSlidesShowing();
                     }
                 }
                 // if moveSlides is 0 (auto) divide children length by sides showing, then round up
             }else{
-                pagerQty = Math.ceil(slider.children.length / getNumberSlidesShowing());
+                pagerQty = Math.ceil(this.children.length / this.getNumberSlidesShowing());
             }
             return pagerQty;
-            */
-            return this.children.length;
+
+
+        },
+
+        /**
+         * Returns the number of indivual slides by which to shift the slider
+         */
+        getMoveBy: function(){
+            // if moveSlides was set by the user and moveSlides is less than number of slides showing
+            if(this.opts.moveSlides > 0 && this.opts.moveSlides <= this.getNumberSlidesShowing()){
+                return this.opts.moveSlides;
+            }
+            // if moveSlides is 0 (auto)
+            return this.getNumberSlidesShowing();
         },
 
         setSlidePosition:function(){
-            // get the position of the first showing slide
-            var position = this.children.eq(this.active.index).position();
-
-            // check for last slide
-            if (this.active.index == this.getPagerQty() - 1) this.active.last = true;
-
-            // set the repective position
-            if (position != undefined){
-                this.setPositionProperty(-position.left, 'reset', 0);
+            // if last slide, not infinite loop, and number of children is larger than specified maxSlides
+            if(this.children.length > this.opts.maxSlides && this.active.last && !this.opts.infiniteLoop){
+                if (this.opts.mode == 'horizontal'){
+                    // get the last child's position
+                    var lastChild = this.children.last();
+                    var position = lastChild.position();
+                    // set the left position
+                    this.setPositionProperty(-(position.left - (this.viewport.width() - lastChild.width())), 'reset', 0);
+                }else if(slider.settings.mode == 'vertical'){
+                    /*
+                    // get the last showing index's position
+                    var lastShowingIndex = slider.children.length - slider.settings.minSlides;
+                    var position = slider.children.eq(lastShowingIndex).position();
+                    // set the top position
+                    setPositionProperty(-position.top, 'reset', 0);
+                    */
+                }
+                // if not last slide
+            }else{
+                // get the position of the first showing slide
+                var position = this.children.eq(this.active.index * this.getMoveBy()).position();
+                // check for last slide
+                if (this.active.index == this.getPagerQty() - 1) this.active.last = true;
+                // set the repective position
+                if (position != undefined){
+                    if (this.opts.mode == 'horizontal') this.setPositionProperty(-position.left, 'reset', 0);
+                    //else if (slider.settings.mode == 'vertical') setPositionProperty(-position.top, 'reset', 0);
+                }
             }
         },
 
@@ -375,13 +429,14 @@ console.log(slideIndex);
 
             // update the slide position
             this.setSlidePosition();
-            /*
-            if(!slider.settings.ticker) setSlidePosition();
+
             // if active.last was true before the screen resize, we want
             // to keep it last no matter what screen size we end on
-            if (slider.active.last) slider.active.index = getPagerQty() - 1;
+            if (this.active.last) this.active.index = this.getPagerQty() - 1;
             // if the active index (page) no longer exists due to the resize, simply set the index as last
-            if (slider.active.index >= getPagerQty()) slider.active.last = true;
+            if (this.active.index >= this.getPagerQty()) this.active.last = true;
+
+            /*
             // if a pager is being displayed and a custom pager is not being used, update it
             if(slider.settings.pager && !slider.settings.pagerCustom){
             populatePager();
