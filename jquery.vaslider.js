@@ -52,10 +52,9 @@
 
             // store active slide information
             this.active = { index: this.opts.startSlide }
-            // store if the slider is in carousel mode (displaying / moving multiple slides)
-            this.carousel = this.opts.minSlides > 1 || this.opts.maxSlides > 1;
-            // if carousel, force preloadImages = 'all'
-            if(this.carousel) this.opts.preloadImages = 'all';
+
+            // force preloadImages = 'all'
+            this.opts.preloadImages = 'all';
 
             // store the current state of the slider (if currently animating, working is true)
             this.working = false;
@@ -278,26 +277,42 @@
             var moveBy = 0;
             var position = {left: 0, top: 0};
 
-            // horizontal carousel, going previous while on first slide (infiniteLoop mode)
-            if(this.carousel && this.active.last && direction == 'prev'){
-console.log('if(this.carousel');
+
+            // if not infinite loop
+            if(!this.opts.infiniteLoop && slider.active.last){
+                if(this.opts.mode == 'horizontal'){
+                    // get the last child position
+                    var lastChild = this.children.eq(this.children.length - 1);
+                    position = lastChild.position();
+                    // calculate the position of the last slide
+                    moveBy = this.viewport.width() - lastChild.width();
+                }else{
+                    /*
+                    // get last showing index position
+                    var lastShowingIndex = slider.children.length - slider.settings.minSlides;
+                    position = slider.children.eq(lastShowingIndex).position();
+                    */
+                }
+                // horizontal, going previous while on first slide (infiniteLoop mode)
+            }else if(this.active.last && direction == 'prev'){
                 // get the last child position
-                //var eq = slider.settings.moveSlides == 1 ? slider.settings.maxSlides - getMoveBy() : ((getPagerQty() - 1) * getMoveBy()) - (slider.children.length - slider.settings.maxSlides);
-                //var lastChild = el.children('.bx-clone').eq(eq);
-                //position = lastChild.position();
+                var eq = this.opts.moveSlides == 1 ? this.opts.maxSlides - this.getMoveBy() : ((this.getPagerQty() - 1) * this.getMoveBy()) - (this.children.length - this.opts.maxSlides);
+                var lastChild = el.children('.va-clone').eq(eq);
+                position = lastChild.position();
                 // if infinite loop and "Next" is clicked on the last slide
             }else if(direction == 'next' && this.active.index == 0){
-console.log('else if(direction == next');
                 // get the last clone position
                 position = this.$el.find('> .va-clone').eq(this.opts.maxSlides).position();
                 this.active.last = false;
-
                 // normal non-zero requests
             }else if(slideIndex >= 0){
-console.log('else if(slideIndex >= 0');
-                position = this.children.eq(slideIndex).position();
+                var requestEl = slideIndex * this.getMoveBy();
+                position = this.children.eq(requestEl).position();
             }
-//console.log(slideIndex);
+
+
+
+
             /* If the position doesn't exist
              * (e.g. if you destroy the slider on a next click),
              * it doesn't throw an error.
@@ -307,10 +322,6 @@ console.log('else if(slideIndex >= 0');
                 // plugin values to be animated
                 this.setPositionProperty(value, 'slide', this.opts.speed);
             }
-
-            console.log(position);
-
-            this.working = false;
         },
 
 
@@ -407,13 +418,46 @@ console.log('else if(slideIndex >= 0');
             var animateObj = {};
             animateObj[this.animProp] = value;
             if(type == 'slide'){
-                this.$el.animate(animateObj, duration, 'linear', function(){
-                    //updateAfterSlideTransition();
-                });
+
+
+                $.proxy(this.$el.animate(animateObj, duration, 'linear', $.proxy(function(){
+                    this.updateAfterSlideTransition();
+                }, this)), this);
+
+
+
             }else if(type == 'reset'){
                 this.$el.css(this.animProp, value)
             }
         },
+
+
+        /**
+         * Performs needed actions after a slide transition
+         */
+        updateAfterSlideTransition:function(){
+            // if infinte loop is true
+            if(this.opts.infiniteLoop){
+                var position = '';
+                // first slide
+                if(this.active.index == 0){
+                    // set the new position
+                    position = this.children.eq(0).position();
+                    // carousel, last slide
+                }else if(this.active.index == this.getPagerQty() - 1){
+                    position = this.children.eq((this.getPagerQty() - 1) * this.getMoveBy()).position();
+                    // last slide
+                }else if(this.active.index == this.children.length - 1){
+                    position = this.children.eq(this.children.length - 1).position();
+                }
+                if (this.opts.mode == 'horizontal') { this.setPositionProperty(-position.left, 'reset', 0);; }
+                //else if (slider.settings.mode == 'vertical') { setPositionProperty(-position.top, 'reset', 0);; }
+            }
+            // declare that the transition is complete
+            this.working = false;
+
+        },
+
 
         /**
          * Update all dynamic slider elements
