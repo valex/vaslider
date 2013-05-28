@@ -12,10 +12,13 @@
         // Options
         this.opts = $.extend({
             // GENERAL
+            mode: 'horizontal',
             infiniteLoop: true,
             preloadImages : 'all',
             speed: 500,
             startSlide: 0,
+            adaptiveHeight: true,
+            adaptiveHeightSpeed: 500,
 
             // AUTO
             pause: 4000,
@@ -127,6 +130,8 @@
 
             this.setSlidePosition();
 
+            // if "vertical" mode, always use adaptiveHeight to prevent odd behavior
+            if (this.opts.mode == 'vertical') this.opts.adaptiveHeight = true;
 
             // set the viewport height
             this.viewport.height(this.getViewportHeight());
@@ -203,15 +208,32 @@
             var height = 0;
             // first determine which children (slides) should be used in our height calculation
             var children = $();
+            // if mode is not "vertical" and adaptiveHeight is false, include all children
+            if(this.opts.mode != 'vertical' && !this.opts.adaptiveHeight){
+                children = this.children;
+            }else{
+                // return the single active child
+                children = this.children.eq(this.active.index);
+            }
 
-            children = this.children;//.eq();
+            // if "vertical" mode, calculate the sum of the heights of the children
+            if(this.opts.mode == 'vertical'){
+                children.each(function(index) {
+                    height += $(this).outerHeight();
+                });
+                // add user-supplied margins
+                if(this.opts.slideMargin > 0){
+                    height += this.opts.slideMargin * (this.opts.minSlides - 1);
+                }
+                // if not "vertical" mode, calculate the max height of the children
+            }else{
+                height = Math.max.apply(Math, children.map(function(){
+                    return $(this).outerHeight(false);
 
-            height = Math.max.apply(Math, children.map(function(){
-                return $(this).outerHeight(false);
-
-            }).get());
-
+                }).get());
+            }
             return height;
+
         },
 
         getSlideWidth:function(){
@@ -273,6 +295,11 @@
 
             // check if last slide
             this.active.last = this.active.index >= this.getPagerQty() - 1;
+
+            // if adaptiveHeight is true and next height is different from current height, animate to the new height
+            if(this.opts.adaptiveHeight && this.viewport.height() != this.getViewportHeight()){
+                this.viewport.animate({height: this.getViewportHeight()}, this.opts.adaptiveHeightSpeed);
+            }
 
             var moveBy = 0;
             var position = {left: 0, top: 0};
@@ -504,7 +531,7 @@
                 $obj.data('vaSlider', (data = new VASlider(this, option)));
             }
 
-            console.log($obj.data('vaSlider'));
+            //console.log($obj.data('vaSlider'));
             //slider.init();
         });
     };
